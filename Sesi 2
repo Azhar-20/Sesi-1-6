@@ -1,0 +1,107 @@
+import time
+import numpy as np
+from multiprocessing import Pool, cpu_count
+
+# ==============================================================
+# 1. SETUP PARAMETER SIMULASI NUMERIK POLUSI PM2.5 LOKAL
+# ==============================================================
+GRID_SIZE = 300       # Ukuran grid area lokal (300 x 300 titik pantau)
+TIME_STEPS = 50       # Langkah iterasi waktu difusi
+DIFFUSION_COEFF = 0.1 # Koefisien difusi udara
+
+def inisialisasi_grid(size):
+    """Membuat peta persebaran awal dengan sumber polusi titik lokal."""
+    grid = np.zeros((size, size), dtype=np.float64)
+    # Titik polusi tinggi (misal: kawasan industri dan jalan protokol lokal)
+    grid[size // 4, size // 4] = 250.0
+    grid[size // 2, size // 2] = 400.0
+    grid[3 * size // 4, 3 * size // 4] = 180.0
+    return grid
+
+# ==============================================================
+# 2. KOMPUTASI SEKUENSIAL (SINGLE-CORE / BASELINE NON-HPC)
+# ==============================================================
+def difusi_sekuensial(grid, steps, alpha):
+    """Menghitung penyebaran polutan langkah demi langkah secara serial."""
+    u = grid.copy()
+    for _ in range(steps):
+        # Persamaan beda hingga 2D (Laplacian filter sederhana)
+        laplacian = (
+            np.roll(u, 1, axis=0) + np.roll(u, -1, axis=0) +
+            np.roll(u, 1, axis=1) + np.roll(u, -1, axis=1) - 4 * u
+        )
+        u += alpha * laplacian
+    return u
+
+# ==============================================================
+# 3. KOMPUTASI PARALEL (SIMULASI PRINSIP HPC / MULTI-CORE)
+# ==============================================================
+def hitung_chunk_laplacian(subgrid_data):
+    """Worker fungsi untuk memproses sub-area matriks secara paralel."""
+    subgrid, top_ghost, bottom_ghost, alpha = subgrid_data
+    # Gabungkan ghost cells untuk pertukaran boundary (seperti prinsip MPI di HPC)
+    expanded = np.vstack([top_ghost, subgrid, bottom_ghost])
+    laplacian = (
+        expanded[:-2, :] + expanded[2:, :] +
+        np.roll(expanded[1:-1, :], 1, axis=1) + np.roll(expanded[1:-1, :], -1, axis=1) -
+        4 * expanded[1:-1, :]
+    )
+    return subgrid + alpha * laplacian
+
+def difusi_paralel(grid, steps, alpha, num_workers):
+    """Membagi domain grid menjadi beberapa bagian untuk dikerjakan worker paralel."""
+    u = grid.copy()
+    chunk_size = GRID_SIZE // num_workers
+    
+    with Pool(processes=num_workers) as pool:
+        for _ in range(steps):
+            tasks = []
+            for i in range(num_workers):
+                start_row = i * chunk_size
+                end_row = (i + 1) * chunk_size if i != num_workers - 1 else GRID_SIZE
+                subgrid = u[start_row:end_row, :]
+                
+                # Ghost cell sharing antar proses
+                top_ghost = u[start_row - 1:start_row, :] if start_row > 0 else u[0:1, :]
+                bottom_ghost = u[end_row:end_row + 1, :] if end_row < GRID_SIZE else u[-1:, :]
+                
+                tasks.append((subgrid, top_ghost, bottom_ghost, alpha))
+            
+            # Eksekusi paralel di semua core CPU
+            results = pool.map(hitung_chunk_laplacian, tasks)
+            u = np.vstack(results)
+            
+    return u
+
+# ==============================================================
+# 4. BENCHMARK & EVALUASI KECEPATAN (FLOPS & SPEEDUP)
+# ==============================================================
+if __name__ == '__main__':
+    cores_tersedia = cpu_count()
+    print("=" * 60)
+    print("SIMULASI HPC UNTUK TANTANGAN LOKAL: PREDIKSI DIFUSI PM2.5")
+    print(f"Dimensi Grid: {GRID_SIZE}x{GRID_SIZE} | Iterasi Waktu: {TIME_STEPS}")
+    print(f"Jumlah CPU Cores Terdeteksi: {cores_tersedia}")
+    print("=" * 60)
+
+    grid_awal = inisialisasi_grid(GRID_SIZE)
+
+    # 1. Uji Sekuensial
+    t_start = time.time()
+    hasil_serial = difusi_sekuensial(grid_awal, TIME_STEPS, DIFFUSION_COEFF)
+    t_serial = time.time() - t_start
+    print(f"[Sekuensial / Single-Core] Waktu Eksekusi: {t_serial:.4f} detik")
+
+    # 2. Uji Paralel (HPC)
+    t_start = time.time()
+    hasil_paralel = difusi_paralel(grid_awal, TIME_STEPS, DIFFUSION_COEFF, num_workers=cores_tersedia)
+    t_paralel = time.time() - t_start
+    print(f"[Paralel / {cores_tersedia} Cores]       Waktu Eksekusi: {t_paralel:.4f} detik")
+
+    # 3. Metrik Speedup & Efisiensi
+    speedup = t_serial / t_paralel if t_paralel > 0 else 0
+    print("-" * 60)
+    print(f"Akselerasi Komputasi (Speedup) : {speedup:.2f}x lebih cepat")
+    print(f"Rata-rata Konsentrasi Polusi  : {np.mean(hasil_paralel):.2f} ug/m3")
+    print(f"Konsentrasi Polusi Tertinggi  : {np.max(hasil_paralel):.2f} ug/m3")
+    print("=" * 60)
