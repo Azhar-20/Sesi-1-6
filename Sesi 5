@@ -1,0 +1,165 @@
+# ==============================================================
+# STUDI KASUS SESI 5: HUMAN-COMPUTER INTERACTION & DATA VISUALIZATION
+# Generator Dasbor Analitik Interaktif Berbasis Prinsip IMK & Gestalt
+# ==============================================================
+
+# Data kinerja metrik operasional
+data_metrik = [
+    {"nama": "Efisiensi Server Cloud", "nilai": 92, "status": "OPTIMAL", "warna": "#2ecc71"},
+    {"nama": "Penggunaan Memori Sistem", "nilai": 78, "status": "WASPADA", "warna": "#f39c12"},
+    {"nama": "Tingkat Transaksi Gagal", "nilai": 14, "status": "KRITIS", "warna": "#e74c3c"},
+    {"nama": "Akurasi Model Machine Learning", "nilai": 88, "status": "OPTIMAL", "warna": "#2ecc71"},
+    {"nama": "Waktu Respons Antarmuka (ms)", "nilai": 95, "status": "OPTIMAL", "warna": "#2ecc71"}
+]
+
+# Template HTML/CSS dengan implementasi prinsip desain IMK:
+# 1. Preattentive Attributes (warna kontras & badge visual)
+# 2. Gestalt Principles (Proximity & Enclosure lewat card layout)
+# 3. 5 Prinsip Interaksi (Visibility, Affordance tombol, Feedback interaktif)
+html_konten = f"""<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dasbor Monitoring Berbasis Prinsip IMK</title>
+    <style>
+        body {{
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 24px;
+            color: #333;
+        }}
+        .header {{
+            margin-bottom: 24px;
+        }}
+        .header h1 {{
+            margin: 0 0 8px 0;
+            font-size: 22px;
+            color: #2c3e50;
+        }}
+        .header p {{
+            margin: 0;
+            font-size: 14px;
+            color: #7f8c8d;
+        }}
+        /* Gestalt: Law of Enclosure & Proximity */
+        .grid-container {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }}
+        .card {{
+            background: #ffffff;
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+            border-top: 4px solid #3498db;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }}
+        .card:hover {{
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        }}
+        .card-title {{
+            font-size: 13px;
+            font-weight: 600;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }}
+        .card-value {{
+            font-size: 32px;
+            font-weight: bold;
+            margin: 10px 0;
+            color: #2c3e50;
+        }}
+        /* Preattentive Attribute: Encoding Warna Status */
+        .status-badge {{
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #ffffff;
+        }}
+        /* Interaktivitas & Affordance Tombol */
+        .btn-action {{
+            background-color: #2980b9;
+            color: #ffffff;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }}
+        .btn-action:hover {{
+            background-color: #1f618d;
+        }}
+        #feedback-area {{
+            margin-top: 16px;
+            padding: 12px;
+            background: #e8f4f8;
+            border-left: 4px solid #2980b9;
+            font-size: 13px;
+            display: none;
+        }}
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Sistem Monitoring Kinerja Operasional</h1>
+        <p>Implementasi IMK: Meminimalkan Beban Kognitif Melalui Fitur Visual Preatentif</p>
+    </div>
+
+    <!-- Menampilkan indikator dalam 5 chunks (Batas memori kerja 7 +/- 2) -->
+    <div class="grid-container">
+"""
+
+for item in data_metrik:
+    html_konten += f"""
+        <div class="card" style="border-top-color: {item['warna']};">
+            <div class="card-title">{item['nama']}</div>
+            <div class="card-value">{item['nilai']}</div>
+            <span class="status-badge" style="background-color: {item['warna']};">{item['status']}</span>
+        </div>
+    """
+
+html_konten += """
+    </div>
+
+    <!-- Prinsip Interaksi: Visibility, Affordance & Feedback -->
+    <div>
+        <button class="btn-action" onclick="tampilkanFeedback()">Jalankan Diagnostik Sistem</button>
+        <div id="feedback-area"></div>
+    </div>
+
+    <script>
+        function tampilkanFeedback() {
+            var box = document.getElementById('feedback-area');
+            box.style.display = 'block';
+            box.innerHTML = '<strong>Umpan Balik Sistem:</strong> Diagnostik selesai. Anomali terdeteksi pada <em>Tingkat Transaksi Gagal</em> (Status Kritis). Tindakan mitigasi direkomendasikan.';
+        }
+    </script>
+</body>
+</html>
+"""
+
+# Simpan hasil pembuatan dasbor ke berkas HTML
+nama_file = "dashboard_imk.html"
+with open(nama_file, "w", encoding="utf-8") as f:
+    f.write(html_konten)
+
+print("=" * 60)
+print("STUDI KASUS SESI 5: IMK & VISUALISASI DATA")
+print("=" * 60)
+print(f"File '{nama_file}' berhasil dibuat secara otomatis.")
+print("Prinsip yang diterapkan:")
+print("1. Working Memory Limit: 5 unit ringkasan informasi utama.")
+print("2. Preattentive Visual Attributes: Pewarnaan status optimal/waspada/kritis.")
+print("3. Gestalt Law: Pengelompokan batas kontainer (Enclosure) per metrik.")
+print("4. Interaction Principle: Tombol fungsional disertai umpan balik (feedback).")
+print("=" * 60)
