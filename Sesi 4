@@ -1,0 +1,96 @@
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report, confusion_matrix
+
+# ==============================================================
+# STUDI KASUS SESI 4: MACHINE LEARNING WORKFLOW (SUPERVISED LEARNING)
+# Klasifikasi Persetujuan Pinjaman (Loan Approval Classification)
+# ==============================================================
+
+# 1. PENGUMPULAN DATA (DATA COLLECTION) - SIMULASI DATASET NASABAH
+np.random.seed(42)
+n_samples = 400
+
+data = {
+    'pendapatan_bulanan': np.random.uniform(3.0, 35.0, n_samples),  # Juta rupiah
+    'jumlah_pinjaman': np.random.uniform(10.0, 150.0, n_samples),   # Juta rupiah
+    'skor_kredit': np.random.randint(300, 850, n_samples),          # Rentang 300 - 850
+    'usia_pemohon': np.random.randint(21, 60, n_samples),
+    'rasio_utang': np.random.uniform(0.1, 0.7, n_samples)           # Debt-to-Income ratio
+}
+
+df = pd.DataFrame(data)
+
+# Logika aturan kelayakan pinjaman lapangan (1: Disetujui, 0: Ditolak)
+syarat_setuju = (
+    (df['skor_kredit'] >= 600).astype(int) * 0.4 +
+    (df['pendapatan_bulanan'] >= 7.0).astype(int) * 0.3 +
+    (df['rasio_utang'] <= 0.45).astype(int) * 0.3
+)
+df['status_pinjaman'] = (syarat_setuju >= 0.6).astype(int)
+
+# 2. PRA-PEMROSESAN DATA (DATA PREPROCESSING)
+# Cek data duplikat atau nilai kosong untuk mencegah garbage in, garbage out
+df.drop_duplicates(inplace=True)
+df.fillna(df.median(), inplace=True)
+
+fitur = ['pendapatan_bulanan', 'jumlah_pinjaman', 'skor_kredit', 'usia_pemohon', 'rasio_utang']
+X = df[fitur]
+y = df['status_pinjaman']
+
+# 3. PEMISAHAN DATA (DATA SPLITTING)
+# Membagi 80% data latih (training set) dan 20% data uji (testing set)
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.20, random_state=42, stratify=y
+)
+
+# Standarisasi fitur agar memiliki skala yang seimbang
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+# 4. PEMILIHAN & PELATIHAN MODEL (MODEL TRAINING)
+# Memanfaatkan Random Forest Classifier untuk meminimalkan risiko overfitting
+model = RandomForestClassifier(n_estimators=100, max_depth=6, random_state=42)
+model.fit(X_train_scaled, y_train)
+
+# 5. PENGUJIAN & EVALUASI (MODEL EVALUATION)
+y_pred = model.predict(X_test_scaled)
+
+print("=" * 60)
+print("ALUR KERJA MACHINE LEARNING: KLASIFIKASI PERSETUJUAN PINJAMAN")
+print("=" * 60)
+print(f"Total Dataset       : {len(df)} nasabah")
+print(f"Jumlah Data Latih   : {len(X_train)} sampel (80%)")
+print(f"Jumlah Data Uji     : {len(X_test)} sampel (20%)\n")
+
+print("--- CONFUSION MATRIX ---")
+cm = confusion_matrix(y_test, y_pred)
+print(f"True Negative (Ditolak Benar)  : {cm[0][0]}")
+print(f"False Positive (Salah Disetujui): {cm[0][1]}")
+print(f"False Negative (Salah Ditolak)  : {cm[1][0]}")
+print(f"True Positive (Disetujui Benar) : {cm[1][1]}\n")
+
+print("--- LAPORAN METRIKS EVALUASI (PRECISION, RECALL, F1-SCORE) ---")
+print(classification_report(y_test, y_pred, target_names=['Ditolak (0)', 'Disetujui (1)']))
+
+# 6. PENERAPAN / INFERENSI (DEPLOYMENT SAMPLE)
+print("--- CONTOH INFERENSI NASABAH BARU ---")
+nasabah_baru = np.array([
+    [12.5, 40.0, 720, 29, 0.25],   # Nasabah A (Profil Baik)
+    [4.0, 80.0, 480, 23, 0.60]     # Nasabah B (Profil Berisiko)
+])
+
+nasabah_baru_scaled = scaler.transform(nasabah_baru)
+hasil_prediksi = model.predict(nasabah_baru_scaled)
+probabilitas = model.predict_proba(nasabah_baru_scaled)
+
+kategori = {0: "DITOLAK", 1: "DISETUJUI"}
+for i, pred in enumerate(hasil_prediksi):
+    label = kategori[pred]
+    persen_setuju = probabilitas[i][1] * 100
+    print(f"Nasabah {chr(65+i)} -> Status: {label} (Keyakinan: {persen_setuju:.1f}%)")
+print("=" * 60)
