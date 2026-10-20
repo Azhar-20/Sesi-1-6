@@ -1,0 +1,101 @@
+import math
+import json
+
+# ==============================================================
+# STUDI KASUS SESI 3: GIS ASSET MANAGEMENT AUTOMATION
+# Otomatisasi Penilaian Aset & Analisis Spasial (Buffer & Proximity)
+# ==============================================================
+
+# 1. PENGUMPULAN DATA ASET LAPANGAN (SIMULASI SENSOR / FIELD DATA)
+# Representasi data tabular spasial tanpa dependensi eksternal C-libraries
+daftar_aset = [
+    {"id": "AST-001", "nama": "Jembatan Muara", "tipe": "Jembatan", "lat": -3.785, "lon": 102.260, "umur_tahun": 14, "retak_mm": 5.2},
+    {"id": "AST-002", "nama": "Gorong-gorong Sentral", "tipe": "Drainase", "lat": -3.790, "lon": 102.265, "umur_tahun": 4, "retak_mm": 0.8},
+    {"id": "AST-003", "nama": "Tiang Fiber Optik A1", "tipe": "Utilitas", "lat": -3.782, "lon": 102.258, "umur_tahun": 9, "retak_mm": 3.1},
+    {"id": "AST-004", "nama": "Pipa Distribusi Utama", "tipe": "Air Bersih", "lat": -3.801, "lon": 102.272, "umur_tahun": 22, "retak_mm": 8.7},
+    {"id": "AST-005", "nama": "Lampu Jalan Protokol", "tipe": "Penerangan", "lat": -3.788, "lon": 102.261, "umur_tahun": 2, "retak_mm": 0.0},
+    {"id": "AST-006", "nama": "Tanggul Penahan Banjir", "tipe": "Drainase", "lat": -3.805, "lon": 102.278, "umur_tahun": 18, "retak_mm": 6.5}
+]
+
+# Koordinat episentrum zona bahaya / genangan air (Hazard Zone)
+ZONA_BAHAYA = {"lat": -3.800, "lon": 102.270, "radius_m": 800}
+
+# ==============================================================
+# 2. FUNGSI PERHITUNGAN JARAK GEOSPASIAL (HAVERSINE FORMULA)
+# ==============================================================
+def hitung_jarak_meter(lat1, lon1, lat2, lon2):
+    """Menghitung jarak lengkung bumi antara dua koordinat (meter)."""
+    R = 6371000  # Radius bumi (meter)
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    delta_phi = math.radians(lat2 - lat1)
+    delta_lambda = math.radians(lon2 - lon1)
+
+    a = (math.sin(delta_phi / 2) ** 2 +
+         math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2) ** 2)
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
+
+# ==============================================================
+# 3. OTOMASI PENILAIAN KONDISI & SPATIAL BUFFER FILTERING
+# ==============================================================
+print("=" * 65)
+print("SISTEM OTOMASI MANAJEMEN ASET GEOSPASIAL (OPEN-SOURCE PIPELINE)")
+print("=" * 65)
+
+aset_kritis = []
+
+for aset in daftar_aset:
+    # A. Hitung proximity terhadap zona bahaya (Buffer Analysis)
+    jarak_ke_hazard = hitung_jarak_meter(
+        aset["lat"], aset["lon"], 
+        ZONA_BAHAYA["lat"], ZONA_BAHAYA["lon"]
+    )
+    aset["jarak_ke_hazard_m"] = round(jarak_ke_hazard, 2)
+    aset["dalam_buffer_bahaya"] = jarak_ke_hazard <= ZONA_BAHAYA["radius_m"]
+
+    # B. Aturan Penentuan Kondisi (Asset Health Score)
+    skor_kondisi = (aset["umur_tahun"] * 0.4) + (aset["retak_mm"] * 0.6)
+    if skor_kondisi > 7.0 or aset["dalam_buffer_bahaya"]:
+        aset["status_pemeliharaan"] = "URGENT_INSPECTION"
+        aset_kritis.append(aset)
+    elif skor_kondisi > 4.0:
+        aset["status_pemeliharaan"] = "SCHEDULED_MAINTENANCE"
+    else:
+        aset["status_pemeliharaan"] = "GOOD_CONDITION"
+
+# ==============================================================
+# 4. LAPORAN & EKSPOR GEODATA (GeoJSON Format)
+# ==============================================================
+print(f"Total Aset Terdaftar        : {len(daftar_aset)}")
+print(f"Aset Memerlukan Intervensi  : {len(aset_kritis)}")
+print("-" * 65)
+print(f"{'ID':<10} {'NAMA ASET':<22} {'JARAK HAZARD':<15} {'STATUS'}")
+print("-" * 65)
+
+for a in daftar_aset:
+    print(f"{a['id']:<10} {a['nama']:<22} {str(a['jarak_ke_hazard_m']) + ' m':<15} {a['status_pemeliharaan']}")
+
+# Ekspor representasi standar GIS GeoJSON FeatureCollection
+geojson_output = {
+    "type": "FeatureCollection",
+    "features": [
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [a["lon"], a["lat"]]
+            },
+            "properties": {
+                "id": a["id"],
+                "nama": a["nama"],
+                "tipe": a["tipe"],
+                "status": a["status_pemeliharaan"]
+            }
+        } for a in daftar_aset
+    ]
+}
+
+print("=" * 65)
+print("Contoh Fitur GeoJSON Siap Pakai di WebGIS/QGIS:")
+print(json.dumps(geojson_output["features"][0], indent=2))
