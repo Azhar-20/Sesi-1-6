@@ -1,0 +1,111 @@
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import classification_report
+
+# ==============================================================
+# 1. TAHAP DATA UNDERSTANDING & PREPARATION (CRISP-DM)
+# Penanganan kualitas data mentah untuk menghindari Garbage In, Garbage Out
+# ==============================================================
+np.random.seed(42)
+n_samples = 250
+
+data = {
+    'invoice_id': [f"INV-{1000 + i}" for i in range(n_samples)],
+    'total_belanja': np.random.uniform(5, 120, n_samples),        # juta rupiah
+    'diskon_persen': np.random.choice([0, 5, 10, 15, 25], n_samples),
+    'lama_langganan_bulan': np.random.randint(1, 48, n_samples),
+    'riwayat_telat_kali': np.random.poisson(1.3, n_samples)
+}
+
+df = pd.DataFrame(data)
+
+# Simulasi data kotor (missing values) dari sistem transaksi lapangan
+df.loc[12:18, 'total_belanja'] = np.nan
+df.loc[45:50, 'lama_langganan_bulan'] = np.nan
+
+# Label status gagal bayar / macet (1: Macet, 0: Lancar)
+indikator_risiko = (
+    (df['riwayat_telat_kali'] > 2).astype(int) * 0.4 +
+    (df['diskon_persen'] >= 15).astype(int) * 0.4 +
+    (df['lama_langganan_bulan'] < 6).astype(int) * 0.2
+)
+df['status_macet'] = (indikator_risiko > 0.4).astype(int)
+
+# Pembersihan data: Imputasi nilai hilang menggunakan nilai median
+df['total_belanja'] = df['total_belanja'].fillna(df['total_belanja'].median())
+df['lama_langganan_bulan'] = df['lama_langganan_bulan'].fillna(df['lama_langganan_bulan'].median())
+
+# ==============================================================
+# 2. ANALISIS DESKRIPTIF (Menjawab: Apa yang telah terjadi?)
+# ==============================================================
+print("=" * 50)
+print("1. ANALISIS DESKRIPTIF")
+print("=" * 50)
+total_faktur = len(df)
+total_macet = df['status_macet'].sum()
+persentase_macet = (total_macet / total_faktur) * 100
+
+print(f"Total Faktur Piutang   : {total_faktur}")
+print(f"Faktur Berisiko Macet  : {total_macet} ({persentase_macet:.2f}%)")
+print(f"Rata-rata Nilai Belanja: Rp {df['total_belanja'].mean():.2f} Juta\n")
+
+# ==============================================================
+# 3. ANALISIS DIAGNOSTIK (Menjawab: Mengapa hal itu terjadi?)
+# ==============================================================
+print("=" * 50)
+print("2. ANALISIS DIAGNOSTIK")
+print("=" * 50)
+tabel_kontingensi = pd.crosstab(
+    df['diskon_persen'], 
+    df['status_macet'], 
+    normalize='index'
+) * 100
+
+print("Dampak Besaran Diskon (%) terhadap Rasio Piutang Macet:")
+for diskon, baris in tabel_kontingensi.iterrows():
+    print(f"- Diskon {diskon:>2}% -> Lancar: {baris[0]:.1f}%, Macet: {baris[1]:.1f}%")
+print()
+
+# ==============================================================
+# 4. ANALISIS PREDIKTIF (Menjawab: Apa yang berpotensi terjadi?)
+# ==============================================================
+print("=" * 50)
+print("3. ANALISIS PREDIKTIF (LOGISTIC REGRESSION)")
+print("=" * 50)
+fitur = ['total_belanja', 'diskon_persen', 'lama_langganan_bulan', 'riwayat_telat_kali']
+X = df[fitur]
+y = df['status_macet']
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.25, random_state=42, stratify=y
+)
+
+model = LogisticRegression(random_state=42)
+model.fit(X_train, y_train)
+
+y_pred = model.predict(X_test)
+print(classification_report(y_test, y_pred, target_names=['Lancar (0)', 'Macet (1)']))
+
+# ==============================================================
+# 5. ANALISIS PRESKRIPTIF (Menjawab: Tindakan apa yang harus diambil?)
+# ==============================================================
+print("=" * 50)
+print("4. ANALISIS PRESKRIPTIF (REKOMENDASI BISNIS OTOMATIS)")
+print("=" * 50)
+
+def tentukan_kebijakan(prob):
+    if prob >= 0.65:
+        return "Tolak Kredit - Wajib Pembayaran Tunai di Muka"
+    elif prob >= 0.35:
+        return "Batas Plafon 50% & Wajib Jaminan / Tenor 7 Hari"
+    else:
+        return "Persetujuan Kredit Normal (Termin 30 Hari)"
+
+uji_preskriptif = X_test.copy()
+uji_preskriptif['probabilitas_macet'] = model.predict_proba(X_test)[:, 1]
+uji_preskriptif['rekomendasi_tindakan'] = uji_preskriptif['probabilitas_macet'].apply(tentukan_kebijakan)
+
+for idx, baris in uji_preskriptif.head(5).iterrows():
+    print(f"Faktur #{idx} | Prob. Risiko: {baris['probabilitas_macet']:.3f} | Keputusan: {baris['rekomendasi_tindakan']}")
